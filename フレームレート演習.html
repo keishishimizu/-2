@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>パラパラ漫画 FPS比較シミュレーター (30fps vs Custom)</title>
+ <!-- Tailwind CSS -->
+ <script src="https://cdn.tailwindcss.com"></script>
+ <!-- FontAwesome -->
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+ <!-- Google Fonts -->
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+
+ <style>
+ body {
+ font-family: 'Noto Sans JP', sans-serif;
+ background-color: #0f172a;
+ color: #f8fafc;
+ }
+ .font-poppins {
+ font-family: 'Poppins', sans-serif;
+ }
+ /* キャンバス枠の紙質感 */
+ .paper-canvas {
+ background-color: #ffffff;
+ box-shadow: inset 0 0 10px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+ background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+ background-size: 16px 16px;
+ }
+ /* パラパラ感のパラパラノート風デザイン */
+ .flipbook-binder {
+ border-left: 12px solid #334155;
+ position: relative;
+ }
+ .flipbook-binder::before {
+ content: '';
+ position: absolute;
+ top: 0;
+ left: -12px;
+ bottom: 0;
+ width: 4px;
+ background: #1e293b;
+ }
+ </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+ <!-- ヘッダー -->
+ <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-50 shadow-md">
+ <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+ <div class="flex items-center gap-3">
+ <div class="bg-blue-600 text-white p-2.5 rounded-xl shadow-lg shadow-blue-500/30">
+ <i class="fa-solid fa-book-open-reader text-2xl"></i>
+ </div>
+ <div>
+ <h1 class="text-xl font-bold tracking-wide text-white">パラパラ漫画 FPS比較シミュレーター</h1>
+ <p class="text-xs text-slate-400">標準「30 FPS」と自由設定の「カスタム FPS (5〜240)」を比較しよう</p>
+ </div>
+ </div>
+
+ <!-- タブ切り替えボタン -->
+ <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+ <button id="tabPresetBtn" onclick="switchMode('preset')" class="px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow">
+ <i class="fa-solid fa-play"></i> 比較観賞モード
+ </button>
+ <button id="tabDrawBtn" onclick="switchMode('draw')" class="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition flex items-center gap-2">
+ <i class="fa-solid fa-pen-nib"></i> 自分で描くモード
+ </button>
+ </div>
+ </div>
+ </header>
+
+ <!-- メインコンテンツ -->
+ <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow">
+
+ <!-- ==================== MODE 1: プリセット比較モード ==================== -->
+ <div id="presetMode" class="space-y-6">
+
+ <!-- コントロールパネル (上部) -->
+ <div class="bg-slate-800/80 backdrop-blur rounded-2xl p-5 border border-slate-700/80 shadow-xl flex flex-wrap items-center justify-between gap-4">
+ <!-- モチーフ選択 -->
+ <div class="flex items-center gap-3">
+ <span class="text-sm font-bold text-slate-300"><i class="fa-solid fa-film text-blue-400 mr-1"></i> アニメーション:</span>
+ <select id="presetSelect" onchange="changePreset()" class="bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-2 font-medium text-sm focus:outline-none focus:border-blue-500 transition">
+ <option value="stickman">🏃‍♂️ 走る棒人間 (Stickman Run)</option>
+ <option value="ball">🏀 跳ねるスーパーボール (Bouncing Ball)</option>
+ <option value="pendulum">⏱️ 振子と残像 (Pendulum & Trail)</option>
+ <option value="wheel">🎡 高速回転車輪 (Spinning Wheel)</option>
+ </select>
+ </div>
+
+ <!-- 再生コントロール -->
+ <div class="flex items-center gap-3">
+ <button id="playPauseBtn" onclick="togglePlay()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-2">
+ <i id="playIcon" class="fa-solid fa-pause"></i> <span id="playText">一時停止</span>
+ </button>
+
+ <button onclick="stepFrame()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-1">
+ <i class="fa-solid fa-step-forward"></i> 1コマ進む
+ </button>
+ </div>
+
+ <!-- 速度＆オプション -->
+ <div class="flex items-center gap-4">
+ <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+ <span class="text-xs text-slate-400 font-bold">再生速度:</span>
+ <select id="speedSelect" onchange="changeSpeed()" class="bg-transparent text-white font-bold text-sm focus:outline-none cursor-pointer">
+ <option value="1">1.0x (等速)</option>
+ <option value="0.5">0.5x (半速スロー)</option>
+ <option value="0.25">0.25x (超スロー)</option>
+ </select>
+ </div>
+
+ <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+ <input type="checkbox" id="trailToggle" onchange="toggleTrail()" class="rounded text-blue-600 focus:ring-0">
+ <span class="text-xs font-bold">残像 (軌跡) 表示</span>
+ </label>
+ </div>
+ </div>
+
+ <!-- カスタムFPS調整バー -->
+ <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700/80 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+ <div class="flex items-center gap-3 w-full md:w-auto">
+ <i class="fa-solid fa-sliders text-purple-400 text-xl"></i>
+ <div>
+ <span class="text-sm font-bold text-white">設定画面のFPS（フレームレート）: </span>
+ <span id="customFpsValue" class="text-lg font-extrabold text-purple-400 font-poppins">15 FPS</span>
+ </div>
+ </div>
+
+ <div class="flex-grow w-full max-w-md">
+ <input type="range" id="fpsSlider" min="5" max="240" step="1" value="15" oninput="updateCustomFPS(this.value)" class="w-full accent-purple-500 cursor-pointer">
+ </div>
+
+ <div class="flex gap-1.5 flex-wrap">
+ <button onclick="setFPSPreset(5)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded text-slate-200">5</button>
+ <button onclick="setFPSPreset(12)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded text-slate-200">12 (アニメ)</button>
+ <button onclick="setFPSPreset(24)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded text-slate-200">24 (映画)</button>
+ <button onclick="setFPSPreset(60)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded text-slate-200">60</button>
+ <button onclick="setFPSPreset(120)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded text-slate-200">120</button>
+ </div>
+ </div>
+
+ <!-- 2画面キャンバス比較表示 -->
+ <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+ <!-- 30 FPS キャンバス (固定標準) -->
+ <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700/80 shadow-2xl flex flex-col items-center">
+ <div class="w-full flex justify-between items-center mb-3">
+ <div class="flex items-center gap-2">
+ <span class="bg-emerald-500/20 text-emerald-400 font-poppins font-bold px-3 py-1 rounded-full text-xs border border-emerald-500/30">
+ 30 FPS (標準)
+ </span>
+ <span class="text-xs text-slate-400">（日本のテレビ番組・標準動画）</span>
+ </div>
+ <div class="text-xs text-slate-400 font-mono">1コマ: 約 33.3 ms</div>
+ </div>
+
+ <!-- キャンバス本体 -->
+ <div class="relative w-full aspect-video rounded-xl overflow-hidden paper-canvas flipbook-binder border border-slate-300">
+ <canvas id="canvas30" width="560" height="315" class="w-full h-full object-contain"></canvas>
+ <div class="absolute bottom-2 right-3 bg-slate-900/80 text-emerald-400 px-2.5 py-1 rounded text-xs font-mono font-bold border border-slate-700">
+ 更新: <span id="frame30Count">0</span> コマ/秒
+ </div>
+ </div>
+
+ <!-- 特徴解説 -->
+ <div class="w-full mt-4 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 text-xs text-slate-300">
+ <p class="font-bold text-emerald-300 mb-1"><i class="fa-solid fa-circle-check"></i> 30fpsの特徴:</p>
+ <p>日本のテレビ放送やYouTubeの標準的なフレームレート（1秒間に30枚）。一般的な映像表現として十分に滑らかな動きが得られます。</p>
+ </div>
+ </div>
+
+ <!-- カスタム FPS キャンバス -->
+ <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700/80 shadow-2xl flex flex-col items-center">
+ <div class="w-full flex justify-between items-center mb-3">
+ <div class="flex items-center gap-2">
+ <span id="customFpsBadge" class="bg-purple-500/20 text-purple-400 font-poppins font-bold px-3 py-1 rounded-full text-xs border border-purple-500/30">
+ 15 FPS (設定)
+ </span>
+ <span class="text-xs text-slate-400">（自由設定値: 5〜240）</span>
+ </div>
+ <div class="text-xs text-slate-400 font-mono">1コマ: 約 <span id="customFrameTime">66.6</span> ms</div>
+ </div>
+
+ <!-- キャンバス本体 -->
+ <div class="relative w-full aspect-video rounded-xl overflow-hidden paper-canvas flipbook-binder border border-slate-300">
+ <canvas id="canvasCustom" width="560" height="315" class="w-full h-full object-contain"></canvas>
+ <div class="absolute bottom-2 right-3 bg-slate-900/80 text-purple-400 px-2.5 py-1 rounded text-xs font-mono font-bold border border-slate-700">
+ 更新: <span id="frameCustomCount">0</span> コマ/秒
+ </div>
+ </div>
+
+ <!-- 特徴解説 -->
+ <div class="w-full mt-4 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 text-xs text-slate-300">
+ <p class="font-bold text-purple-300 mb-1"><i class="fa-solid fa-sliders"></i> 設定FPSの特徴:</p>
+ <p id="customDescription">低FPSではコマ送り感が強くなりパラパラ漫画のような味わいに。高FPS（60〜240）では滑らかさが増していきます。</p>
+ </div>
+
+ </div>
+
+ </div>
+
+ </div>
+
+ <!-- ==================== MODE 2: 自分でパラパラ漫画を描くモード ==================== -->
+ <div id="drawMode" class="hidden space-y-6">
+
+ <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl">
+ <div class="flex flex-col lg:flex-row gap-6">
+
+ <!-- 左側: お絵かきキャンバス & ツール -->
+ <div class="flex-grow flex flex-col items-center">
+ <div class="w-full flex justify-between items-center mb-3">
+ <h3 class="font-bold text-white flex items-center gap-2">
+ <i class="fa-solid fa-palette text-blue-400"></i> コマを描く
+ <span class="text-xs font-normal text-slate-400">（現在のコマ: <span id="currentFrameNum" class="text-blue-400 font-bold">1</span> / <span id="totalFramesNum">1</span>）</span>
+ </h3>
+
+ <!-- ツール類 -->
+ <div class="flex items-center gap-2">
+ <button onclick="setTool('pen')" id="penToolBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white">
+ <i class="fa-solid fa-pen"></i> ペン
+ </button>
+ <button onclick="setTool('eraser')" id="eraserToolBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600">
+ <i class="fa-solid fa-eraser"></i> 消しゴム
+ </button>
+ <button onclick="clearSingleFrame()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 hover:bg-slate-600 text-slate-200">
+ <i class="fa-solid fa-eraser"></i> このコマをクリア
+ </button>
+ <button onclick="clearAllFrames()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600/80 hover:bg-rose-600 text-white">
+ <i class="fa-solid fa-trash"></i> 全コマ削除
+ </button>
+ </div>
+ </div>
+
+ <!-- 描画キャンバス -->
+ <div class="relative w-full max-w-[560px] aspect-video rounded-xl overflow-hidden paper-canvas flipbook-binder border-2 border-blue-500 shadow-inner">
+ <!-- オニオンスキン（前コマのうっすらした表示） -->
+ <canvas id="onionCanvas" width="560" height="315" class="absolute inset-0 pointer-events-none opacity-30"></canvas>
+ <!-- 描画用メインキャンバス -->
+ <canvas id="drawCanvas" width="560" height="315" class="absolute inset-0 cursor-crosshair"></canvas>
+ </div>
+
+ <!-- オプション & コマ操作 -->
+ <div class="w-full max-w-[560px] mt-4 flex items-center justify-between gap-4">
+ <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+ <input type="checkbox" id="onionToggle" checked onchange="updateOnionSkin()" class="rounded text-blue-600">
+ <span>オニオンスキン（前のコマを透かして表示）</span>
+ </label>
+
+ <div class="flex items-center gap-2">
+ <button onclick="addFrame()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow flex items-center gap-1">
+ <i class="fa-solid fa-plus"></i> 次のコマを追加
+ </button>
+ </div>
+ </div>
+
+ <!-- フィルムストリップ (コマ一覧) -->
+ <div class="w-full max-w-[560px] mt-4">
+ <div class="text-xs font-bold text-slate-400 mb-2">コマフィルムストリップ:</div>
+ <div id="filmstrip" class="flex gap-2 overflow-x-auto p-2 bg-slate-900 rounded-xl border border-slate-700 min-h-[80px] items-center">
+ <!-- JSでコマサムネイルが追加される -->
+ </div>
+ </div>
+ </div>
+
+ <!-- 右側: 自作アニメーションの30fps vs CustomFPS 比較再生 -->
+ <div class="w-full lg:w-[400px] flex flex-col justify-between bg-slate-900/80 p-5 rounded-xl border border-slate-700">
+ <div>
+ <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+ <i class="fa-solid fa-circle-play text-emerald-400"></i> 作成したパラパラ漫画の再生
+ </h3>
+ <p class="text-xs text-slate-400 mb-4">描いたコマを「30fps」と「設定したFPS」で再生比較します。</p>
+
+ <!-- 自作アニメプレビューキャンバス -->
+ <div class="space-y-4">
+ <div>
+ <div class="text-xs font-bold text-emerald-400 mb-1">30 fps 再生 (標準):</div>
+ <div class="aspect-video bg-white rounded-lg overflow-hidden border border-slate-600 relative">
+ <canvas id="customPlay30" width="360" height="202.5" class="w-full h-full object-contain"></canvas>
+ </div>
+ </div>
+ <div>
+ <div class="text-xs font-bold text-purple-400 mb-1"><span id="customDrawFpsLabel">15</span> fps 再生 (設定値):</div>
+ <div class="aspect-video bg-white rounded-lg overflow-hidden border border-slate-600 relative">
+ <canvas id="customPlayCustom" width="360" height="202.5" class="w-full h-full object-contain"></canvas>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <!-- 再生コントロール -->
+ <div class="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">
+ <button id="customPlayBtn" onclick="toggleCustomPlay()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30">
+ <i class="fa-solid fa-play"></i> 自作パラパラ漫画を再生
+ </button>
+ </div>
+ </div>
+
+ </div>
+ </div>
+
+ </div>
+
+ </main>
+
+ <!-- フッター -->
+ <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+ パラパラ漫画 FPS (Frames Per Second) 学習・比較ツール | 情報Ⅰ メディアとデジタル表現
+ </footer>
+
+ <!-- JavaScript アプリケーションロジック -->
+ <script>
+ // --- 状態管理 ---
+ let mode = 'preset'; // 'preset' or 'draw'
+ let isPlaying = true;
+ let speed = 1.0;
+ let showTrail = false;
+ let currentPreset = 'stickman';
+ let targetCustomFPS = 15; // カスタムFPS初期値
+
+ // FPSアニメーション用変数
+ let animationFrameId;
+ let lastTime = 0;
+ let timeAccumulator30 = 0;
+ let timeAccumulatorCustom = 0;
+ let globalTick = 0; // アニメーション進行用タイムスタンプ
+
+ // キャンバス要素
+ const canvas30 = document.getElementById('canvas30');
+ const ctx30 = canvas30.getContext('2d');
+ const canvasCustom = document.getElementById('canvasCustom');
+ const ctxCustom = canvasCustom.getContext('2d');
+
+ // FPSカウンター表示用
+ let framesCount30 = 0;
+ let framesCountCustom = 0;
+ let lastFpsUpdate = 0;
+
+ // --- モード切り替え ---
+ function switchMode(newMode) {
+ mode = newMode;
+ const presetModeEl = document.getElementById('presetMode');
+ const drawModeEl = document.getElementById('drawMode');
+ const tabPresetBtn = document.getElementById('tabPresetBtn');
+ const tabDrawBtn = document.getElementById('tabDrawBtn');
+
+ if (mode === 'preset') {
+ presetModeEl.classList.remove('hidden');
+ drawModeEl.classList.add('hidden');
+ tabPresetBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow";
+ tabDrawBtn.className = "px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition flex items-center gap-2";
+ } else {
+ presetModeEl.classList.add('hidden');
+ drawModeEl.classList.remove('hidden');
+ tabDrawBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow";
+ tabPresetBtn.className = "px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition flex items-center gap-2";
+ initDrawCanvas();
+ }
+ }
+
+ // --- FPS設定変更 ---
+ function updateCustomFPS(val) {
+ targetCustomFPS = parseInt(val);
+ document.getElementById('customFpsValue').innerText = `${targetCustomFPS} FPS`;
+ document.getElementById('customFpsBadge').innerText = `${targetCustomFPS} FPS (設定)`;
+ document.getElementById('customFrameTime').innerText = (1000 / targetCustomFPS).toFixed(1);
+ document.getElementById('customDrawFpsLabel').innerText = targetCustomFPS;
+
+ // 自作パラパラ漫画が再生中の場合はタイマー再設定
+ if (isCustomPlaying) {
+ toggleCustomPlay(); // 一度止めて
+ toggleCustomPlay(); // 再開
+ }
+ }
+
+ function setFPSPreset(val) {
+ document.getElementById('fpsSlider').value = val;
+ updateCustomFPS(val);
+ }
+
+ // --- コントロール操作 ---
+ function togglePlay() {
+ isPlaying = !isPlaying;
+ const playIcon = document.getElementById('playIcon');
+ const playText = document.getElementById('playText');
+ if (isPlaying) {
+ playIcon.className = 'fa-solid fa-pause';
+ playText.innerText = '一時停止';
+ } else {
+ playIcon.className = 'fa-solid fa-play';
+ playText.innerText = '再生';
+ }
+ }
+
+ function stepFrame() {
+ isPlaying = false;
+ document.getElementById('playIcon').className = 'fa-solid fa-play';
+ document.getElementById('playText').innerText = '再生';
+ globalTick += 0.033 * speed;
+ renderFrames(globalTick, true);
+ }
+
+ function changePreset() {
+ currentPreset = document.getElementById('presetSelect').value;
+ }
+
+ function changeSpeed() {
+ speed = parseFloat(document.getElementById('speedSelect').value);
+ }
+
+ function toggleTrail() {
+ showTrail = document.getElementById('trailToggle').checked;
+ }
+
+ // --- 描画ロジック (プリセットアニメーション) ---
+ function renderFrames(t, forceStep = false) {
+ if (!showTrail) {
+ ctx30.clearRect(0, 0, canvas30.width, canvas30.height);
+ ctxCustom.clearRect(0, 0, canvasCustom.width, canvasCustom.height);
+ } else {
+ ctx30.fillStyle = 'rgba(255, 255, 255, 0.15)';
+ ctx30.fillRect(0, 0, canvas30.width, canvas30.height);
+ ctxCustom.fillStyle = 'rgba(255, 255, 255, 0.15)';
+ ctxCustom.fillRect(0, 0, canvasCustom.width, canvasCustom.height);
+ }
+
+ drawObject(ctx30, t);
+ drawObject(ctxCustom, t);
+ }
+
+ function drawObject(ctx, t) {
+ const w = ctx.canvas.width;
+ const h = ctx.canvas.height;
+
+ if (currentPreset === 'stickman') {
+ const runCycle = (t * 8) % 4;
+ const x = (t * 120) % (w + 80) - 40;
+ const y = h / 2 + 20;
+ drawStickman(ctx, x, y, Math.floor(runCycle));
+ } else if (currentPreset === 'ball') {
+ const cycle = (t * 2) % (Math.PI * 2);
+ const x = (t * 150) % (w + 60) - 30;
+ const bounceY = Math.abs(Math.sin(cycle)) * 180;
+ const y = h - 50 - bounceY;
+
+ ctx.beginPath();
+ ctx.arc(x, y, 22, 0, Math.PI * 2);
+ ctx.fillStyle = '#2563eb';
+ ctx.fill();
+ ctx.lineWidth = 3;
+ ctx.strokeStyle = '#1e3a8a';
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.arc(x - 7, y - 7, 6, 0, Math.PI * 2);
+ ctx.fillStyle = 'rgba(255,255,255,0.6)';
+ ctx.fill();
+ } else if (currentPreset === 'pendulum') {
+ const angle = Math.sin(t * 4) * (Math.PI / 3);
+ const pivotX = w / 2;
+ const pivotY = 30;
+ const len = 200;
+ const bobX = pivotX + Math.sin(angle) * len;
+ const bobY = pivotY + Math.cos(angle) * len;
+
+ ctx.beginPath();
+ ctx.moveTo(pivotX, pivotY);
+ ctx.lineTo(bobX, bobY);
+ ctx.strokeStyle = '#64748b';
+ ctx.lineWidth = 4;
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.arc(bobX, bobY, 25, 0, Math.PI * 2);
+ ctx.fillStyle = '#e11d48';
+ ctx.fill();
+ ctx.strokeStyle = '#881337';
+ ctx.lineWidth = 3;
+ ctx.stroke();
+ } else if (currentPreset === 'wheel') {
+ const cx = w / 2;
+ const cy = h / 2;
+ const radius = 90;
+ const rot = t * 12;
+
+ ctx.save();
+ ctx.translate(cx, cy);
+ ctx.rotate(rot);
+
+ ctx.beginPath();
+ ctx.arc(0, 0, radius, 0, Math.PI * 2);
+ ctx.lineWidth = 8;
+ ctx.strokeStyle = '#0284c7';
+ ctx.stroke();
+
+ for (let i = 0; i < 4; i++) {
+ ctx.beginPath();
+ ctx.moveTo(0, 0);
+ const a = (i * Math.PI) / 2;
+ ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+ ctx.lineWidth = 5;
+ ctx.strokeStyle = '#0f172a';
+ ctx.stroke();
+ }
+
+ ctx.restore();
+ }
+ }
+
+ function drawStickman(ctx, x, y, frame) {
+ ctx.save();
+ ctx.translate(x, y);
+ ctx.strokeStyle = '#0f172a';
+ ctx.lineWidth = 5;
+ ctx.lineCap = 'round';
+
+ ctx.beginPath();
+ ctx.arc(0, -60, 16, 0, Math.PI * 2);
+ ctx.fillStyle = '#0f172a';
+ ctx.fill();
+
+ ctx.beginPath();
+ ctx.moveTo(0, -44);
+ ctx.lineTo(0, -10);
+ ctx.stroke();
+
+ const poses = [
+ { lArm: -0.8, rArm: 0.8, lLeg: 0.8, rLeg: -0.8 },
+ { lArm: -0.2, rArm: 0.2, lLeg: 0.3, rLeg: -0.3 },
+ { lArm: 0.8, rArm: -0.8, lLeg: -0.8, rLeg: 0.8 },
+ { lArm: 0.2, rArm: -0.2, lLeg: -0.3, rLeg: 0.3 }
+ ];
+ const p = poses[frame % 4];
+
+ ctx.beginPath();
+ ctx.moveTo(0, -35);
+ ctx.lineTo(Math.sin(p.lArm) * 25, -35 + Math.cos(p.lArm) * 25);
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.moveTo(0, -35);
+ ctx.lineTo(Math.sin(p.rArm) * 25, -35 + Math.cos(p.rArm) * 25);
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.moveTo(0, -10);
+ ctx.lineTo(Math.sin(p.lLeg) * 30, -10 + Math.cos(p.lLeg) * 30);
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.moveTo(0, -10);
+ ctx.lineTo(Math.sin(p.rLeg) * 30, -10 + Math.cos(p.rLeg) * 30);
+ ctx.stroke();
+
+ ctx.restore();
+ }
+
+ // --- メインアニメーションループ (時間管理) ---
+ function animLoop(timestamp) {
+ if (!lastTime) lastTime = timestamp;
+ const delta = (timestamp - lastTime) / 1000;
+ lastTime = timestamp;
+
+ if (isPlaying && mode === 'preset') {
+ globalTick += delta * speed;
+
+ // 30fps 更新チェック
+ timeAccumulator30 += delta;
+ if (timeAccumulator30 >= (1 / 30)) {
+ if (!showTrail) ctx30.clearRect(0, 0, canvas30.width, canvas30.height);
+ drawObject(ctx30, globalTick);
+ timeAccumulator30 %= (1 / 30);
+ framesCount30++;
+ }
+
+ // カスタムFPS 更新チェック
+ timeAccumulatorCustom += delta;
+ const customInterval = 1 / targetCustomFPS;
+ if (timeAccumulatorCustom >= customInterval) {
+ if (!showTrail) ctxCustom.clearRect(0, 0, canvasCustom.width, canvasCustom.height);
+ drawObject(ctxCustom, globalTick);
+ timeAccumulatorCustom %= customInterval;
+ framesCountCustom++;
+ }
+ }
+
+ // FPSカウンター表示更新 (1秒毎)
+ if (timestamp - lastFpsUpdate >= 1000) {
+ document.getElementById('frame30Count').innerText = framesCount30;
+ document.getElementById('frameCustomCount').innerText = framesCountCustom;
+ framesCount30 = 0;
+ framesCountCustom = 0;
+ lastFpsUpdate = timestamp;
+ }
+
+ animationFrameId = requestAnimationFrame(animLoop);
+ }
+
+ // ==================== 自作パラパラ漫画描画機能 ====================
+ let framesData = []; 
+ let currentFrameIndex = 0;
+ let isDrawing = false;
+ let activeTool = 'pen';
+
+ const drawCanvas = document.getElementById('drawCanvas');
+ const drawCtx = drawCanvas.getContext('2d');
+ const onionCanvas = document.getElementById('onionCanvas');
+ const onionCtx = onionCanvas.getContext('2d');
+
+ function initDrawCanvas() {
+ if (framesData.length === 0) {
+ resetToSingleEmptyFrame();
+ } else {
+ loadFrame(currentFrameIndex);
+ }
+ setupDrawingEvents();
+ updateFilmstrip();
+ }
+
+ function resetToSingleEmptyFrame() {
+ drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+ framesData = [drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height)];
+ currentFrameIndex = 0;
+ updateOnionSkin();
+ updateFilmstrip();
+ }
+
+ function setupDrawingEvents() {
+ drawCanvas.onmousedown = startDrawing;
+ drawCanvas.onmousemove = draw;
+ drawCanvas.onmouseup = stopDrawing;
+ drawCanvas.onmouseleave = stopDrawing;
+
+ drawCanvas.ontouchstart = (e) => {
+ const touch = e.touches[0];
+ const rect = drawCanvas.getBoundingClientRect();
+ startDrawing({ clientX: touch.clientX, clientY: touch.clientY, rect });
+ };
+ drawCanvas.ontouchmove = (e) => {
+ const touch = e.touches[0];
+ draw({ clientX: touch.clientX, clientY: touch.clientY });
+ };
+ drawCanvas.ontouchend = stopDrawing;
+ }
+
+ function setTool(tool) {
+ activeTool = tool;
+ document.getElementById('penToolBtn').className = tool === 'pen' ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600';
+ document.getElementById('eraserToolBtn').className = tool === 'eraser' ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600';
+ }
+
+ function getCanvasCoords(e) {
+ const rect = drawCanvas.getBoundingClientRect();
+ return {
+ x: (e.clientX - rect.left) * (drawCanvas.width / rect.width),
+ y: (e.clientY - rect.top) * (drawCanvas.height / rect.height)
+ };
+ }
+
+ function startDrawing(e) {
+ isDrawing = true;
+ const { x, y } = getCanvasCoords(e);
+ drawCtx.beginPath();
+ drawCtx.moveTo(x, y);
+ }
+
+ function draw(e) {
+ if (!isDrawing) return;
+ const { x, y } = getCanvasCoords(e);
+
+ if (activeTool === 'pen') {
+ drawCtx.strokeStyle = '#0f172a';
+ drawCtx.lineWidth = 4;
+ drawCtx.lineCap = 'round';
+ drawCtx.lineTo(x, y);
+ drawCtx.stroke();
+ } else {
+ drawCtx.clearRect(x - 12, y - 12, 24, 24);
+ }
+ }
+
+ function stopDrawing() {
+ if (isDrawing) {
+ isDrawing = false;
+ saveCurrentFrame();
+ }
+ }
+
+ // 現在表示中の1コマだけ描画をクリア
+ function clearSingleFrame() {
+ drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+ saveCurrentFrame();
+ }
+
+ // 全てのコマを削除して初期化
+ function clearAllFrames() {
+ if (confirm('すべてのコマを削除してリセットしますか？')) {
+ if (isCustomPlaying) {
+ toggleCustomPlay(); // 再生中の場合は止める
+ }
+ resetToSingleEmptyFrame();
+ }
+ }
+
+ function saveCurrentFrame() {
+ framesData[currentFrameIndex] = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+ updateFilmstrip();
+ }
+
+ function addFrame() {
+ saveCurrentFrame();
+ currentFrameIndex++;
+ framesData.splice(currentFrameIndex, 0, drawCtx.createImageData(drawCanvas.width, drawCanvas.height));
+
+ clearSingleFrame();
+ updateOnionSkin();
+ updateFrameUI();
+ }
+
+ function loadFrame(index) {
+ if (index < 0 || index >= framesData.length) return;
+ saveCurrentFrame();
+ currentFrameIndex = index;
+ drawCtx.putImageData(framesData[currentFrameIndex], 0, 0);
+ updateOnionSkin();
+ updateFrameUI();
+ }
+
+ function updateOnionSkin() {
+ onionCtx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
+ const showOnion = document.getElementById('onionToggle').checked;
+
+ if (showOnion && currentFrameIndex > 0 && framesData[currentFrameIndex - 1]) {
+ const tempCanvas = document.createElement('canvas');
+ tempCanvas.width = drawCanvas.width;
+ tempCanvas.height = drawCanvas.height;
+ const tempCtx = tempCanvas.getContext('2d');
+ tempCtx.putImageData(framesData[currentFrameIndex - 1], 0, 0);
+
+ onionCtx.drawImage(tempCanvas, 0, 0);
+ }
+ }
+
+ function updateFrameUI() {
+ document.getElementById('currentFrameNum').innerText = currentFrameIndex + 1;
+ document.getElementById('totalFramesNum').innerText = framesData.length;
+ }
+
+ function updateFilmstrip() {
+ const filmstrip = document.getElementById('filmstrip');
+ filmstrip.innerHTML = '';
+
+ framesData.forEach((imgData, idx) => {
+ const thumbWrapper = document.createElement('div');
+ thumbWrapper.className = `relative flex-shrink-0 w-20 h-12 rounded border-2 cursor-pointer overflow-hidden ${idx === currentFrameIndex ? 'border-blue-500 shadow-md scale-105' : 'border-slate-700 opacity-70'}`;
+ thumbWrapper.onclick = () => loadFrame(idx);
+
+ const c = document.createElement('canvas');
+ c.width = drawCanvas.width;
+ c.height = drawCanvas.height;
+ c.className = 'w-full h-full bg-white object-contain';
+ const cCtx = c.getContext('2d');
+ cCtx.putImageData(imgData, 0, 0);
+
+ const numBadge = document.createElement('span');
+ numBadge.className = 'absolute bottom-0 left-0 bg-slate-900/80 text-white font-bold text-[9px] px-1 rounded-tr';
+ numBadge.innerText = idx + 1;
+
+ thumbWrapper.appendChild(c);
+ thumbWrapper.appendChild(numBadge);
+ filmstrip.appendChild(thumbWrapper);
+ });
+
+ updateFrameUI();
+ }
+
+ // --- 自作アニメーションの再生比較 ---
+ let isCustomPlaying = false;
+ let customPlayTimer30 = null;
+ let customPlayTimerCustom = null;
+ let customFrame30 = 0;
+ let customFrameCustom = 0;
+
+ function toggleCustomPlay() {
+ isCustomPlaying = !isCustomPlaying;
+ const btn = document.getElementById('customPlayBtn');
+
+ if (isCustomPlaying) {
+ btn.innerHTML = '<i class="fa-solid fa-square"></i> 再生停止';
+ btn.className = 'w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30';
+
+ // 30fps再生
+ customPlayTimer30 = setInterval(() => {
+ const canvas = document.getElementById('customPlay30');
+ const ctx = canvas.getContext('2d');
+ ctx.clearRect(0, 0, canvas.width, canvas.height);
+ if (framesData[customFrame30]) {
+ const temp = document.createElement('canvas');
+ temp.width = drawCanvas.width;
+ temp.height = drawCanvas.height;
+ temp.getContext('2d').putImageData(framesData[customFrame30], 0, 0);
+ ctx.drawImage(temp, 0, 0, canvas.width, canvas.height);
+ }
+ customFrame30 = (customFrame30 + 1) % framesData.length;
+ }, 1000 / 30);
+
+ // 設定FPS再生
+ customPlayTimerCustom = setInterval(() => {
+ const canvas = document.getElementById('customPlayCustom');
+ const ctx = canvas.getContext('2d');
+ ctx.clearRect(0, 0, canvas.width, canvas.height);
+ if (framesData[customFrameCustom]) {
+ const temp = document.createElement('canvas');
+ temp.width = drawCanvas.width;
+ temp.height = drawCanvas.height;
+ temp.getContext('2d').putImageData(framesData[customFrameCustom], 0, 0);
+ ctx.drawImage(temp, 0, 0, canvas.width, canvas.height);
+ }
+ customFrameCustom = (customFrameCustom + 1) % framesData.length;
+ }, 1000 / targetCustomFPS);
+
+ } else {
+ btn.innerHTML = '<i class="fa-solid fa-play"></i> 自作パラパラ漫画を再生';
+ btn.className = 'w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30';
+ clearInterval(customPlayTimer30);
+ clearInterval(customPlayTimerCustom);
+ }
+ }
+
+ window.onload = () => {
+ requestAnimationFrame(animLoop);
+ };
+ </script>
+</body>
+</html>
